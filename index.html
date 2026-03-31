@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Bounce Ball V5.4</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #dfe9f3;
+      font-family: Arial, sans-serif;
+      touch-action: none;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas {
+      display: block;
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+      max-width: 100vw;
+      max-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+<script>
+const LANG = {
+  ro: {
+    title: "Bounce Ball",
+    subtitle: "V5.4 magnet + daily reward",
+    start: "START",
+    restart: "RESTART",
+    back: "ÎNAPOI",
+    shop: "SHOP",
+    settings: "SETĂRI",
+    pause: "PAUZĂ",
+    resume: "CONTINUĂ",
+    paused: "PAUZĂ",
+    gameOver: "JOC TERMINAT",
+    score: "Scor",
+    best: "Record",
+    coins: "Coins",
+    totalCoins: "Total",
+    health: "Viață",
+    shopTitle: "Magazin",
+    settingsTitle: "Setări",
+    skins: "Skin-uri",
+    themes: "Teme",
+    buy: "CUMPĂRĂ",
+    equip: "EQUIP",
+    equipped: "ECHIPAT",
+    boss: "BOSS",
+    bossWarning: "Boss incoming!",
+    sound: "Sunet",
+    vibration: "Vibrație",
+    darkUi: "UI Dark",
+    trail: "Trail",
+    difficulty: "Dificultate",
+    easy: "Ușor",
+    medium: "Mediu",
+    hard: "Greu",
+    langBtn: "EN",
+    menuHint: "Racheta urmează mouse-ul sau degetul.",
+    howCoins: "Ia coin-uri, power-up-uri și treci de obstacole",
+    bossDefeated: "Boss învins!",
+    notEnough: "Coins insuficiente",
+    classic: "Clasic",
+    neon: "Neon",
+    fire: "Fire",
+    ice: "Ice",
+    forest: "Forest",
+    sunset: "Sunset",
+    space: "Space",
+    ocean: "Ocean",
+    magnet: "Magnet",
+    magnetOn: "MAGNET",
+    dailyReward: "Daily Reward",
+    claim: "CLAIM",
+    claimed: "CLAIMED",
+    comeTomorrow: "Revino mâine",
+    collected: "Coin colectat"
+  },
+  en: {
+    title: "Bounce Ball",
+    subtitle: "V5.4 magnet + daily reward",
+    start: "START",
+    restart: "RESTART",
+    back: "BACK",
+    shop: "SHOP",
+    settings: "SETTINGS",
+    pause: "PAUSE",
+    resume: "RESUME",
+    paused: "PAUSED",
+    gameOver: "GAME OVER",
+    score: "Score",
+    best: "Best",
+    coins: "Coins",
+    totalCoins: "Total",
+    health: "Health",
+    shopTitle: "Shop",
+    settingsTitle: "Settings",
+    skins: "Skins",
+    themes: "Themes",
+    buy: "BUY",
+    equip: "EQUIP",
+    equipped: "EQUIPPED",
+    boss: "BOSS",
+    bossWarning: "Boss incoming!",
+    sound: "Sound",
+    vibration: "Vibration",
+    darkUi: "Dark UI",
+    trail: "Trail",
+    difficulty: "Difficulty",
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard",
+    langBtn: "RO",
+    menuHint: "The racket follows the mouse or finger.",
+    howCoins: "Collect coins, power-ups and pass obstacles",
+    bossDefeated: "Boss defeated!",
+    notEnough: "Not enough coins",
+    classic: "Classic",
+    neon: "Neon",
+    fire: "Fire",
+    ice: "Ice",
+    forest: "Forest",
+    sunset: "Sunset",
+    space: "Space",
+    ocean: "Ocean",
+    magnet: "Magnet",
+    magnetOn: "MAGNET",
+    dailyReward: "Daily Reward",
+    claim: "CLAIM",
+    claimed: "CLAIMED",
+    comeTomorrow: "Come back tomorrow",
+    collected: "Coin collected"
+  }
+};
+
+let currentLang = "ro";
+function tr(key) { return LANG[currentLang][key] || key; }
+
+// screens: 0 menu, 1 play, 2 over, 3 shop, 4 settings, 5 pause
+let gameScreen = 0;
+let difficulty = "medium";
+let shopTab = "skins";
+
+// physics
+let gravity = 0.18;
+let airfriction = 0.00001;
+let friction = 0.16;
+
+let score = 0;
+let bestScore = Number(localStorage.getItem("bbv54_best") || 0);
+let maxHealth = 100;
+let health = 100;
+let healthDecrease = 4;
+let healthBarWidth = 70;
+
+let ballX, ballY;
+let ballSpeedVert = 0;
+let ballSpeedHorizon = 0;
+let ballSize = 20;
+
+let racketWidth = 100;
+let racketHeight = 10;
+
+let wallSpeed = 3.1;
+let wallInterval = 1350;
+let lastAddTime = 0;
+let minGapHeight = 225;
+let maxGapHeight = 315;
+let wallWidth = 80;
+let walls = [];
+
+let totalCoins = Number(localStorage.getItem("bbv54_totalCoins") || 0);
+let runCoins = 0;
+
+let particles = [];
+let trails = [];
+let notifications = [];
+let coinsOnField = [];
+let magnetsOnField = [];
+
+let magnetActive = false;
+let magnetTimer = 0;
+
+let soundEnabled = getStoredBool("bbv54_sound", true);
+let vibrationEnabled = getStoredBool("bbv54_vibration", true);
+let darkUi = getStoredBool("bbv54_darkUi", false);
+let trailEnabled = getStoredBool("bbv54_trail", true);
+
+let boss = null;
+let bossWarningTimer = 0;
+let bossEveryScore = 12;
+let bossActiveColorPulse = 0;
+
+let uiScale = 1;
+let audioCtx = null;
+
+const skins = [
+  { id: "classic", price: 0, owned: true },
+  { id: "neon", price: 25, owned: false },
+  { id: "fire", price: 55, owned: false },
+  { id: "ice", price: 55, owned: false }
+];
+
+const themes = [
+  { id: "forest", price: 0, owned: true },
+  { id: "sunset", price: 30, owned: false },
+  { id: "space", price: 60, owned: false },
+  { id: "ocean", price: 45, owned: false }
+];
+
+let ownedSkins = loadOwned("bbv54_ownedSkins", ["classic"]);
+let ownedThemes = loadOwned("bbv54_ownedThemes", ["forest"]);
+let equippedSkin = localStorage.getItem("bbv54_equippedSkin") || "classic";
+let equippedTheme = localStorage.getItem("bbv54_equippedTheme") || "forest";
+
+syncOwnership();
+if (!ownedSkins.includes(equippedSkin)) equippedSkin = "classic";
+if (!ownedThemes.includes(equippedTheme)) equippedTheme = "forest";
+saveEquipment();
+
+let startBtn, shopBtn, settingsBtn, restartBtn, backBtn, langBtn;
+let diffEasyBtn, diffMediumBtn, diffHardBtn;
+let settingsToggles = [];
+let shopItemButtons = [];
+let pauseBtn, resumeBtn;
+let skinsTabBtn, themesTabBtn;
+let dailyRewardBtn;
+
+const DAILY_REWARD_AMOUNT = 20;
+
+function getStoredBool(key, fallback) {
+  const v = localStorage.getItem(key);
+  if (v === null) return fallback;
+  return v === "true";
+}
+
+function loadOwned(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || "null");
+    return Array.isArray(v) ? v : fallback.slice();
+  } catch (e) {
+    return fallback.slice();
+  }
+}
+
+function saveOwned() {
+  localStorage.setItem("bbv54_ownedSkins", JSON.stringify(ownedSkins));
+  localStorage.setItem("bbv54_ownedThemes", JSON.stringify(ownedThemes));
+}
+
+function saveEquipment() {
+  localStorage.setItem("bbv54_equippedSkin", equippedSkin);
+  localStorage.setItem("bbv54_equippedTheme", equippedTheme);
+}
+
+function syncOwnership() {
+  skins.forEach(s => s.owned = ownedSkins.includes(s.id));
+  themes.forEach(t => t.owned = ownedThemes.includes(t.id));
+}
+
+function getTodayKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function hasClaimedDailyReward() {
+  return localStorage.getItem("bbv54_dailyRewardDate") === getTodayKey();
+}
+
+function claimDailyReward() {
+  if (hasClaimedDailyReward()) {
+    notify(tr("comeTomorrow"), false);
+    return;
+  }
+  totalCoins += DAILY_REWARD_AMOUNT;
+  localStorage.setItem("bbv54_totalCoins", totalCoins);
+  localStorage.setItem("bbv54_dailyRewardDate", getTodayKey());
+  notify(`+${DAILY_REWARD_AMOUNT} ${tr("coins")}`, true);
+  burstParticles(width / 2, height * 0.58, 24, [241, 196, 15]);
+  soundBuy();
+}
+
+function notify(msg, good) {
+  notifications.push({ text: msg, good: !!good, life: 140 });
+}
+
+function vibrate(ms) {
+  if (vibrationEnabled && navigator.vibrate) navigator.vibrate(ms);
+}
+
+function ensureAudio() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playTone(freq, duration, type, volume) {
+  if (!soundEnabled) return;
+  ensureAudio();
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || "sine";
+  osc.frequency.value = freq;
+  gain.gain.value = volume || 0.03;
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+  gain.gain.setValueAtTime(volume || 0.03, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.start(now);
+  osc.stop(now + duration);
+}
+
+function soundBounce() { playTone(360, 0.06, "sine", 0.03); }
+function soundCoin() { playTone(640, 0.08, "triangle", 0.04); }
+function soundHit() { playTone(180, 0.12, "square", 0.04); }
+function soundBoss() { playTone(220, 0.20, "sawtooth", 0.04); }
+function soundBuy() { playTone(800, 0.05, "sine", 0.04); }
+function soundGameOver() { playTone(150, 0.20, "sawtooth", 0.04); }
+function soundPower() { playTone(520, 0.05, "triangle", 0.03); setTimeout(() => playTone(740, 0.08, "triangle", 0.03), 35); }
+
+function setup() {
+  const s = getCanvasSize();
+  createCanvas(s.w, s.h);
+  setupSizes();
+  applyDifficulty();
+  resetPositions();
+  smooth();
+}
+
+function getCanvasSize() {
+  const w = min(windowWidth - 10, 560);
+  const h = min(windowHeight - 10, 860);
+  return { w, h };
+}
+
+function setupSizes() {
+  uiScale = min(width / 560, height / 860);
+  ballSize = 20 * uiScale;
+  racketWidth = 100 * uiScale;
+  racketHeight = 10 * uiScale;
+  wallWidth = 80 * uiScale;
+  healthBarWidth = 70 * uiScale;
+}
+
+function applyDifficulty() {
+  if (difficulty === "easy") {
+    gravity = 0.16 * uiScale;
+    friction = 0.17;
+    wallSpeed = 2.7 * uiScale;
+    wallInterval = 1480;
+    minGapHeight = 245 * uiScale;
+    maxGapHeight = 325 * uiScale;
+    healthDecrease = 3;
+  } else if (difficulty === "hard") {
+    gravity = 0.20 * uiScale;
+    friction = 0.15;
+    wallSpeed = 3.6 * uiScale;
+    wallInterval = 1220;
+    minGapHeight = 205 * uiScale;
+    maxGapHeight = 275 * uiScale;
+    healthDecrease = 5;
+  } else {
+    gravity = 0.18 * uiScale;
+    friction = 0.16;
+    wallSpeed = 3.1 * uiScale;
+    wallInterval = 1350;
+    minGapHeight = 225 * uiScale;
+    maxGapHeight = 315 * uiScale;
+    healthDecrease = 4;
+  }
+}
+
+function resetPositions() {
+  ballX = width / 4;
+  ballY = height / 5;
+  ballSpeedVert = 0;
+  ballSpeedHorizon = 0;
+}
+
+function windowResized() {
+  const s = getCanvasSize();
+  resizeCanvas(s.w, s.h);
+  setupSizes();
+  applyDifficulty();
+  resetPositions();
+}
+
+function draw() {
+  drawThemeBackground();
+  updateParticles();
+
+  if (gameScreen === 1) {
+    updateTrail();
+    updateBoss();
+    updateCoins();
+    updateMagnets();
+    updatePowerTimers();
+  }
+
+  drawParticles();
+  drawTrail();
+
+  if (gameScreen === 0) drawMenuScreen();
+  else if (gameScreen === 1) drawGameScreen();
+  else if (gameScreen === 2) drawGameOverScreen();
+  else if (gameScreen === 3) drawShopScreen();
+  else if (gameScreen === 4) drawSettingsScreen();
+  else if (gameScreen === 5) drawPauseScreen();
+
+  drawNotifications();
+}
+
+function drawMenuScreen() {
+  setupMenuButtons();
+  drawHeaderButtons();
+  drawTitleBlock();
+  drawDifficultyButtons();
+  drawMenuCards();
+  drawDailyRewardPanel();
+  drawButton(startBtn, color(46, 204, 113), tr("start"), color(255), false);
+  drawButton(shopBtn, getCardColor(), tr("shop"), getTextMain(), false);
+  drawButton(settingsBtn, getCardColor(), tr("settings"), getTextMain(), false);
+}
+
+function drawGameScreen() {
+  setupGameButtons();
+  drawHeaderButtons();
+
+  drawRacket();
+  watchRacketBounce();
+  drawBall();
+  applyGravity();
+  applyHorizontalSpeed();
+  keepInScreen();
+
+  wallAdder();
+  wallHandler();
+  drawCoins();
+  drawMagnets();
+  drawBoss();
+  drawHud();
+
+  if (bossWarningTimer > 0) {
+    bossWarningTimer--;
+    fill(231, 76, 60, map(bossWarningTimer, 0, 90, 0, 255));
+    textAlign(CENTER, CENTER);
+    textSize(24 * uiScale);
+    text(tr("bossWarning"), width / 2, height * 0.16);
+  }
+}
+
+function drawGameOverScreen() {
+  setupBackRestartButtons();
+  drawHeaderButtons();
+
+  textAlign(CENTER, CENTER);
+  fill(getTextMain());
+  textSize(28 * uiScale);
+  text(tr("gameOver"), width / 2, height * 0.22);
+
+  textSize(16 * uiScale);
+  fill(getTextSoft());
+  text(tr("score"), width / 2, height * 0.34);
+
+  fill(getTextMain());
+  textSize(82 * uiScale);
+  text(score, width / 2, height * 0.47);
+
+  textSize(18 * uiScale);
+  text(`${tr("best")}: ${bestScore}`, width / 2, height * 0.60);
+  text(`${tr("coins")}: +${runCoins}`, width / 2, height * 0.65);
+  text(`${tr("totalCoins")}: ${totalCoins}`, width / 2, height * 0.70);
+
+  drawButton(restartBtn, color(52, 152, 219), tr("restart"), color(255), false);
+  drawButton(backBtn, getCardColor(), tr("back"), getTextMain(), false);
+}
+
+function drawShopScreen() {
+  setupShopButtons();
+  drawHeaderButtons();
+  drawShopPanels();
+}
+
+function drawSettingsScreen() {
+  setupSettingsButtons();
+  drawHeaderButtons();
+  drawSettingsPanel();
+}
+
+function drawPauseScreen() {
+  setupPauseButtons();
+  drawFrozenGame();
+  fill(0, 0, 0, 100);
+  rectMode(CORNER);
+  rect(0, 0, width, height);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(30 * uiScale);
+  text(tr("paused"), width / 2, height * 0.34);
+
+  drawButton(resumeBtn, color(241, 196, 15), tr("resume"), color(44, 62, 80), false);
+  drawButton(restartBtn, color(52, 152, 219), tr("restart"), color(255), false);
+  drawButton(backBtn, getCardColor(), tr("back"), getTextMain(), false);
+  drawHeaderButtons();
+}
+
+function drawFrozenGame() {
+  drawRacket();
+  drawBall();
+  for (let i = 0; i < walls.length; i++) wallDrawer(i);
+  drawCoins();
+  drawMagnets();
+  drawBoss();
+  drawHud();
+}
+
+function setupMenuButtons() {
+  langBtn = { x: width - 44 * uiScale, y: 36 * uiScale, w: 48 * uiScale, h: 30 * uiScale };
+  startBtn = { x: width / 2, y: height * 0.80, w: 190 * uiScale, h: 50 * uiScale };
+  shopBtn = { x: width / 2, y: height * 0.88, w: 190 * uiScale, h: 48 * uiScale };
+  settingsBtn = { x: width / 2, y: height * 0.95, w: 190 * uiScale, h: 44 * uiScale };
+  diffEasyBtn = { x: width * 0.28, y: height * 0.62, w: 98 * uiScale, h: 40 * uiScale };
+  diffMediumBtn = { x: width * 0.50, y: height * 0.62, w: 98 * uiScale, h: 40 * uiScale };
+  diffHardBtn = { x: width * 0.72, y: height * 0.62, w: 98 * uiScale, h: 40 * uiScale };
+  dailyRewardBtn = { x: width / 2, y: height * 0.73, w: 170 * uiScale, h: 42 * uiScale };
+}
+
+function setupGameButtons() {
+  langBtn = { x: width - 44 * uiScale, y: 36 * uiScale, w: 48 * uiScale, h: 30 * uiScale };
+  pauseBtn = { x: 68 * uiScale, y: 36 * uiScale, w: 104 * uiScale, h: 30 * uiScale };
+}
+
+function setupBackRestartButtons() {
+  langBtn = { x: width - 44 * uiScale, y: 36 * uiScale, w: 48 * uiScale, h: 30 * uiScale };
+  restartBtn = { x: width / 2, y: height * 0.82, w: 190 * uiScale, h: 50 * uiScale };
+  backBtn = { x: width / 2, y: height * 0.90, w: 190 * uiScale, h: 48 * uiScale };
+}
+
+function setupShopButtons() {
+  langBtn = { x: width - 44 * uiScale, y: 36 * uiScale, w: 48 * uiScale, h: 30 * uiScale };
+  backBtn = { x: 72 * uiScale, y: 36 * uiScale, w: 100 * uiScale, h: 30 * uiScale };
+  skinsTabBtn = { x: width * 0.38, y: height * 0.19, w: 110 * uiScale, h: 38 * uiScale };
+  themesTabBtn = { x: width * 0.62, y: height * 0.19, w: 110 * uiScale, h: 38 * uiScale };
+}
+
+function setupSettingsButtons() {
+  langBtn = { x: width - 44 * uiScale, y: 36 * uiScale, w: 48 * uiScale, h: 30 * uiScale };
+  backBtn = { x: 72 * uiScale, y: 36 * uiScale, w: 100 * uiScale, h: 30 * uiScale };
+}
+
+function setupPauseButtons() {
+  langBtn = { x: width - 44 * uiScale, y: 36 * uiScale, w: 48 * uiScale, h: 30 * uiScale };
+  resumeBtn = { x: width / 2, y: height * 0.50, w: 190 * uiScale, h: 50 * uiScale };
+  restartBtn = { x: width / 2, y: height * 0.59, w: 190 * uiScale, h: 48 * uiScale };
+  backBtn = { x: width / 2, y: height * 0.68, w: 190 * uiScale, h: 48 * uiScale };
+}
+
+function drawHeaderButtons() {
+  if (langBtn) drawButton(langBtn, getCardColor(), tr("langBtn"), getTextMain(), true);
+  if (gameScreen === 1 && pauseBtn) drawButton(pauseBtn, getCardColor(), tr("pause"), getTextMain(), true);
+  if ((gameScreen === 3 || gameScreen === 4) && backBtn) drawButton(backBtn, getCardColor(), tr("back"), getTextMain(), true);
+}
+
+function drawTitleBlock() {
+  textAlign(CENTER, CENTER);
+  fill(getTextMain());
+  textSize(42 * uiScale);
+  text(tr("title"), width / 2, height * 0.14);
+  textSize(15 * uiScale);
+  fill(getTextSoft());
+  text(tr("subtitle"), width / 2, height * 0.21);
+}
+
+function drawDifficultyButtons() {
+  fill(getTextMain());
+  textAlign(CENTER, CENTER);
+  textSize(16 * uiScale);
+  text(tr("difficulty"), width / 2, height * 0.56);
+  drawButton(diffEasyBtn, difficulty === "easy" ? color(52, 152, 219) : getCardColor(), tr("easy"), difficulty === "easy" ? color(255) : getTextMain(), true);
+  drawButton(diffMediumBtn, difficulty === "medium" ? color(52, 152, 219) : getCardColor(), tr("medium"), difficulty === "medium" ? color(255) : getTextMain(), true);
+  drawButton(diffHardBtn, difficulty === "hard" ? color(52, 152, 219) : getCardColor(), tr("hard"), difficulty === "hard" ? color(255) : getTextMain(), true);
+}
+
+function drawMenuCards() {
+  rectMode(CENTER);
+  noStroke();
+  fill(getCardColor());
+  rect(width / 2, height * 0.35, 300 * uiScale, 130 * uiScale, 18);
+
+  fill(getTextMain());
+  textAlign(CENTER, CENTER);
+  textSize(18 * uiScale);
+  text(`${tr("best")}: ${bestScore}`, width / 2, height * 0.31);
+  text(`${tr("totalCoins")}: ${totalCoins}`, width / 2, height * 0.36);
+  textSize(12 * uiScale);
+  fill(getTextSoft());
+  text(tr("howCoins"), width / 2, height * 0.41);
+  text(tr("menuHint"), width / 2, height * 0.46);
+
+  drawSkinPreview(width * 0.32, height * 0.35, 24 * uiScale, equippedSkin);
+  drawThemeBadge(width * 0.68, height * 0.35, equippedTheme);
+}
+
+function drawDailyRewardPanel() {
+  const claimed = hasClaimedDailyReward();
+
+  rectMode(CENTER);
+  noStroke();
+  fill(getCardColor());
+  rect(width / 2, height * 0.70, 260 * uiScale, 82 * uiScale, 18);
+
+  fill(getTextMain());
+  textAlign(CENTER, CENTER);
+  textSize(16 * uiScale);
+  text(`${tr("dailyReward")}: +${DAILY_REWARD_AMOUNT} ${tr("coins")}`, width / 2, height * 0.67);
+
+  drawButton(
+    dailyRewardBtn,
+    claimed ? color(127, 140, 141) : color(241, 196, 15),
+    claimed ? tr("claimed") : tr("claim"),
+    claimed ? color(255) : color(44, 62, 80),
+    true
+  );
+
+  fill(getTextSoft());
+  textSize(11 * uiScale);
+  text(claimed ? tr("comeTomorrow") : "", width / 2, height * 0.75);
+}
+
+function drawButton(btn, bg, label, txt, compact) {
+  if (!btn) return;
+  rectMode(CENTER);
+  noStroke();
+  fill(0, 0, 0, darkUi ? 28 : 18);
+  rect(btn.x, btn.y + 3 * uiScale, btn.w, btn.h, 15);
+  fill(bg);
+  rect(btn.x, btn.y, btn.w, btn.h, 15);
+  fill(255, 255, 255, darkUi ? 18 : 45);
+  rect(btn.x, btn.y - btn.h * 0.18, btn.w * 0.76, btn.h * 0.24, 14);
+  fill(txt);
+  textAlign(CENTER, CENTER);
+  textSize((compact ? 11 : 17) * uiScale);
+  text(label, btn.x, btn.y + 1 * uiScale);
+}
+
+function getTextMain() {
+  return darkUi ? color(241, 245, 249) : color(44, 62, 80);
+}
+
+function getTextSoft() {
+  return darkUi ? color(176, 188, 204) : color(94, 109, 128);
+}
+
+function getCardColor() {
+  return darkUi ? color(18, 26, 38, 220) : color(255, 255, 255, 220);
+}
+
+function drawShopPanels() {
+  textAlign(CENTER, CENTER);
+  fill(getTextMain());
+  textSize(28 * uiScale);
+  text(tr("shopTitle"), width / 2, height * 0.10);
+  textSize(16 * uiScale);
+  text(`${tr("totalCoins")}: ${totalCoins}`, width / 2, height * 0.14);
+
+  drawButton(skinsTabBtn, shopTab === "skins" ? color(52, 152, 219) : getCardColor(), tr("skins"), shopTab === "skins" ? color(255) : getTextMain(), true);
+  drawButton(themesTabBtn, shopTab === "themes" ? color(52, 152, 219) : getCardColor(), tr("themes"), shopTab === "themes" ? color(255) : getTextMain(), true);
+
+  const panelW = width * 0.86;
+  const panelY = height * 0.58;
+  fill(getCardColor());
+  rectMode(CENTER);
+  noStroke();
+  rect(width / 2, panelY, panelW, 420 * uiScale, 18);
+
+  shopItemButtons = [];
+  const currentList = shopTab === "skins" ? skins : themes;
+  drawShopGrid(currentList, shopTab === "skins");
+}
+
+function drawShopGrid(list, isSkin) {
+  const itemW = 128 * uiScale;
+  const itemH = 132 * uiScale;
+  const startX = width * 0.30;
+  const startY = height * 0.36;
+  const gapX = 145 * uiScale;
+  const gapY = 150 * uiScale;
+
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    const col = i % 2;
+    const row = floor(i / 2);
+    const x = startX + col * gapX;
+    const y = startY + row * gapY;
+
+    fill(darkUi ? color(31, 41, 55, 240) : color(245, 248, 251, 255));
+    rectMode(CENTER);
+    noStroke();
+    rect(x, y, itemW, itemH, 16);
+
+    if (isSkin) drawSkinPreview(x, y - 30 * uiScale, 28 * uiScale, item.id);
+    else drawThemeBadge(x, y - 30 * uiScale, item.id, 56 * uiScale, 38 * uiScale);
+
+    fill(getTextMain());
+    textAlign(CENTER, CENTER);
+    textSize(14 * uiScale);
+    text(tr(item.id), x, y + 10 * uiScale);
+    textSize(12 * uiScale);
+    text(`${item.price} ${tr("coins")}`, x, y + 28 * uiScale);
+
+    const button = { x: x, y: y + 54 * uiScale, w: 90 * uiScale, h: 30 * uiScale, itemId: item.id, isSkin: isSkin };
+    let label = tr("buy");
+    let bg = color(52, 152, 219);
+    let txt = color(255);
+
+    if (item.owned) {
+      if ((isSkin && equippedSkin === item.id) || (!isSkin && equippedTheme === item.id)) {
+        label = tr("equipped");
+        bg = color(46, 204, 113);
+      } else {
+        label = tr("equip");
+        bg = color(241, 196, 15);
+        txt = color(44, 62, 80);
+      }
+    }
+
+    drawButton(button, bg, label, txt, true);
+    shopItemButtons.push(button);
+  }
+}
+
+function buyOrEquip(itemId, isSkin) {
+  const list = isSkin ? skins : themes;
+  const item = list.find(i => i.id === itemId);
+  if (!item) return;
+
+  if (!item.owned) {
+    if (totalCoins < item.price) {
+      notify(tr("notEnough"), false);
+      soundHit();
+      return;
+    }
+    totalCoins -= item.price;
+    localStorage.setItem("bbv54_totalCoins", totalCoins);
+    if (isSkin) ownedSkins.push(item.id);
+    else ownedThemes.push(item.id);
+    saveOwned();
+    syncOwnership();
+    soundBuy();
+  }
+
+  if (isSkin) equippedSkin = item.id;
+  else equippedTheme = item.id;
+  saveEquipment();
+  notify(`${tr(item.id)} ${tr("equipped").toLowerCase()}`, true);
+}
+
+function drawSettingsPanel() {
+  textAlign(CENTER, CENTER);
+  fill(getTextMain());
+  textSize(28 * uiScale);
+  text(tr("settingsTitle"), width / 2, height * 0.11);
+
+  const panelX = width / 2;
+  const panelY = height * 0.50;
+  const panelW = width * 0.84;
+  const panelH = height * 0.66;
+
+  fill(getCardColor());
+  rectMode(CENTER);
+  noStroke();
+  rect(panelX, panelY, panelW, panelH, 20);
+
+  settingsToggles = [];
+  const rows = [
+    { label: tr("sound"), value: soundEnabled, key: "sound" },
+    { label: tr("vibration"), value: vibrationEnabled, key: "vibration" },
+    { label: tr("darkUi"), value: darkUi, key: "darkUi" },
+    { label: tr("trail"), value: trailEnabled, key: "trail" }
+  ];
+
+  for (let i = 0; i < rows.length; i++) {
+    const y = height * 0.26 + i * 0.10 * height;
+    fill(getTextMain());
+    textAlign(LEFT, CENTER);
+    textSize(17 * uiScale);
+    text(rows[i].label, width * 0.20, y);
+
+    const btn = { x: width * 0.73, y: y, w: 100 * uiScale, h: 34 * uiScale, key: rows[i].key };
+    drawButton(btn, rows[i].value ? color(46, 204, 113) : color(127, 140, 141), rows[i].value ? "ON" : "OFF", color(255), true);
+    settingsToggles.push(btn);
+  }
+
+  fill(getTextMain());
+  textAlign(CENTER, CENTER);
+  textSize(18 * uiScale);
+  text(tr("difficulty"), width / 2, height * 0.68);
+
+  diffEasyBtn = { x: width * 0.28, y: height * 0.76, w: 98 * uiScale, h: 40 * uiScale };
+  diffMediumBtn = { x: width * 0.50, y: height * 0.76, w: 98 * uiScale, h: 40 * uiScale };
+  diffHardBtn = { x: width * 0.72, y: height * 0.76, w: 98 * uiScale, h: 40 * uiScale };
+  drawDifficultyButtons();
+}
+
+function toggleSetting(key) {
+  if (key === "sound") {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem("bbv54_sound", soundEnabled);
+  } else if (key === "vibration") {
+    vibrationEnabled = !vibrationEnabled;
+    localStorage.setItem("bbv54_vibration", vibrationEnabled);
+  } else if (key === "darkUi") {
+    darkUi = !darkUi;
+    localStorage.setItem("bbv54_darkUi", darkUi);
+  } else if (key === "trail") {
+    trailEnabled = !trailEnabled;
+    localStorage.setItem("bbv54_trail", trailEnabled);
+  }
+}
+
+function startGame() {
+  score = 0;
+  runCoins = 0;
+  health = maxHealth;
+  walls = [];
+  coinsOnField = [];
+  magnetsOnField = [];
+  particles = [];
+  trails = [];
+  boss = null;
+  bossWarningTimer = 0;
+  magnetActive = false;
+  magnetTimer = 0;
+  applyDifficulty();
+  resetPositions();
+  lastAddTime = millis();
+  gameScreen = 1;
+}
+
+function restartGame() {
+  startGame();
+}
+
+function goMenu() {
+  gameScreen = 0;
+}
+
+function togglePause() {
+  if (gameScreen === 1) gameScreen = 5;
+  else if (gameScreen === 5) gameScreen = 1;
+}
+
+function gameOver() {
+  soundGameOver();
+  vibrate(120);
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem("bbv54_best", bestScore);
+  }
+  totalCoins += runCoins;
+  localStorage.setItem("bbv54_totalCoins", totalCoins);
+  gameScreen = 2;
+}
+
+function drawThemeBackground() {
+  if (equippedTheme === "forest") {
+    background(224, 241, 228);
+    noStroke();
+    fill(191, 230, 198, 180);
+    ellipse(width * 0.2, height * 0.2, 160 * uiScale, 160 * uiScale);
+    ellipse(width * 0.85, height * 0.25, 220 * uiScale, 220 * uiScale);
+    fill(132, 197, 145, 160);
+    rectMode(CORNER);
+    rect(0, height * 0.85, width, height * 0.2);
+  } else if (equippedTheme === "sunset") {
+    for (let i = 0; i < height; i++) {
+      const inter = map(i, 0, height, 0, 1);
+      const c = lerpColor(color(255, 186, 122), color(108, 92, 231), inter);
+      stroke(c);
+      line(0, i, width, i);
+    }
+    noStroke();
+    fill(255, 245, 157, 160);
+    ellipse(width * 0.78, height * 0.23, 90 * uiScale, 90 * uiScale);
+  } else if (equippedTheme === "space") {
+    background(10, 12, 30);
+    noStroke();
+    for (let i = 0; i < 45; i++) {
+      fill(255, 255, 255, 180);
+      circle((i * 97) % width, (i * 53 + frameCount * 0.15) % height, 2 + (i % 3));
+    }
+    fill(125, 95, 255, 35);
+    ellipse(width * 0.25, height * 0.18, 180 * uiScale, 180 * uiScale);
+    ellipse(width * 0.82, height * 0.78, 250 * uiScale, 120 * uiScale);
+  } else if (equippedTheme === "ocean") {
+    background(207, 234, 246);
+    noStroke();
+    fill(126, 214, 223, 130);
+    ellipse(width * 0.2, height * 0.18, 180 * uiScale, 140 * uiScale);
+    ellipse(width * 0.82, height * 0.26, 250 * uiScale, 180 * uiScale);
+    fill(52, 152, 219, 45);
+    for (let i = 0; i < 5; i++) {
+      ellipse(width * 0.2 + i * 110 * uiScale, height * 0.88, 150 * uiScale, 35 * uiScale);
+    }
+  }
+
+  if (darkUi) {
+    fill(0, 0, 0, 35);
+    rectMode(CORNER);
+    rect(0, 0, width, height);
+  }
+}
+
+function getWallColor() {
+  if (equippedTheme === "space") return color(129, 140, 248);
+  if (equippedTheme === "sunset") return color(99, 70, 180);
+  if (equippedTheme === "ocean") return color(41, 128, 185);
+  return color(44, 62, 80);
+}
+
+function updateTrail() {
+  if (!trailEnabled || gameScreen !== 1) return;
+  trails.push({ x: ballX, y: ballY, a: 150, s: ballSize });
+  if (trails.length > 10) trails.shift();
+  for (let i = 0; i < trails.length; i++) trails[i].a *= 0.88;
+}
+
+function drawTrail() {
+  if (!trailEnabled) return;
+  noStroke();
+  for (let i = 0; i < trails.length; i++) {
+    const t = trails[i];
+    fill(52, 152, 219, t.a * 0.25);
+    ellipse(t.x, t.y, t.s * (i / trails.length), t.s * (i / trails.length));
+  }
+}
+
+function drawBall() {
+  drawSkinPreview(ballX, ballY, ballSize, equippedSkin, true);
+
+  if (magnetActive) {
+    noFill();
+    stroke(52, 152, 219, 120 + sin(frameCount * 0.2) * 40);
+    strokeWeight(2);
+    ellipse(ballX, ballY, 90 * uiScale, 90 * uiScale);
+    noStroke();
+  }
+}
+
+function drawSkinPreview(x, y, size, skinId, inGame) {
+  noStroke();
+  if (skinId === "neon") {
+    fill(57, 255, 20, inGame ? 90 : 50);
+    ellipse(x, y, size * 1.45, size * 1.45);
+    fill(18, 18, 18);
+    ellipse(x, y, size, size);
+    fill(57, 255, 20);
+    ellipse(x, y, size * 0.75, size * 0.75);
+  } else if (skinId === "fire") {
+    fill(255, 120, 40, inGame ? 110 : 70);
+    ellipse(x, y - size * 0.08, size * 1.3, size * 1.3);
+    fill(231, 76, 60);
+    ellipse(x, y, size, size);
+    fill(255, 210, 80);
+    ellipse(x - size * 0.12, y - size * 0.12, size * 0.32, size * 0.32);
+  } else if (skinId === "ice") {
+    fill(173, 216, 230, inGame ? 120 : 70);
+    ellipse(x, y, size * 1.35, size * 1.35);
+    fill(99, 179, 237);
+    ellipse(x, y, size, size);
+    fill(255, 255, 255, 150);
+    ellipse(x - size * 0.14, y - size * 0.16, size * 0.30, size * 0.30);
+  } else {
+    fill(24, 28, 34);
+    ellipse(x, y, size, size);
+    fill(255, 255, 255, 100);
+    ellipse(x - size * 0.18, y - size * 0.18, size * 0.28, size * 0.28);
+  }
+}
+
+function drawThemeBadge(x, y, themeId, w, h) {
+  const bw = w || 52 * uiScale;
+  const bh = h || 38 * uiScale;
+  rectMode(CENTER);
+  noStroke();
+  if (themeId === "sunset") fill(253, 203, 110);
+  else if (themeId === "space") fill(72, 52, 212);
+  else if (themeId === "ocean") fill(52, 152, 219);
+  else fill(46, 204, 113);
+  rect(x, y, bw, bh, 10);
+  fill(255, 255, 255, 70);
+  rect(x, y - bh * 0.15, bw * 0.62, bh * 0.22, 10);
+}
+
+function drawRacket() {
+  fill(darkUi ? 245 : 20);
+  rectMode(CENTER);
+  rect(mouseX, mouseY, racketWidth, racketHeight, 5);
+}
+
+function watchRacketBounce() {
+  var overhead = mouseY - pmouseY;
+  if ((ballX + (ballSize / 2) > mouseX - (racketWidth / 2)) && (ballX - (ballSize / 2) < mouseX + (racketWidth / 2))) {
+    if (dist(ballX, ballY, ballX, mouseY) <= (ballSize / 2) + abs(overhead)) {
+      makeBounceBottom(mouseY);
+      ballSpeedHorizon = (ballX - mouseX) / 18;
+      if (overhead < 0) {
+        ballY += (overhead / 4.8);
+        ballSpeedVert += (overhead / 5.0);
+      }
+      ballSpeedVert = constrain(ballSpeedVert, -4.2 * uiScale, 4.2 * uiScale);
+      ballSpeedHorizon = constrain(ballSpeedHorizon, -2.0 * uiScale, 2.0 * uiScale);
+      burstParticles(ballX, ballY, 8, [52, 152, 219]);
+      soundBounce();
+      vibrate(12);
+    }
+  }
+}
+
+function applyGravity() {
+  ballSpeedVert += gravity;
+  ballSpeedVert = constrain(ballSpeedVert, -4.2 * uiScale, 4.8 * uiScale);
+  ballY += ballSpeedVert;
+  ballSpeedVert -= (ballSpeedVert * airfriction);
+}
+
+function applyHorizontalSpeed() {
+  ballX += ballSpeedHorizon;
+  ballSpeedHorizon = constrain(ballSpeedHorizon, -2.0 * uiScale, 2.0 * uiScale);
+  ballSpeedHorizon -= (ballSpeedHorizon * airfriction);
+}
+
+function makeBounceBottom(surface) {
+  ballY = surface - (ballSize / 2);
+  ballSpeedVert *= -1;
+  ballSpeedVert -= (ballSpeedVert * friction);
+}
+
+function makeBounceTop(surface) {
+  ballY = surface + (ballSize / 2);
+  ballSpeedVert *= -1;
+  ballSpeedVert -= (ballSpeedVert * friction);
+}
+
+function makeBounceLeft(surface) {
+  ballX = surface + (ballSize / 2);
+  ballSpeedHorizon *= -1;
+  ballSpeedHorizon -= (ballSpeedHorizon * friction);
+}
+
+function makeBounceRight(surface) {
+  ballX = surface - (ballSize / 2);
+  ballSpeedHorizon *= -1;
+  ballSpeedHorizon -= (ballSpeedHorizon * friction);
+}
+
+function keepInScreen() {
+  if (ballY + (ballSize / 2) > height) {
+    makeBounceBottom(height);
+    soundBounce();
+  }
+  if (ballY - (ballSize / 2) < 0) {
+    makeBounceTop(0);
+    soundBounce();
+  }
+  if (ballX - (ballSize / 2) < 0) {
+    makeBounceLeft(0);
+    soundBounce();
+  }
+  if (ballX + (ballSize / 2) > width) {
+    makeBounceRight(width);
+    soundBounce();
+  }
+}
+
+function wallAdder() {
+  if (boss) return;
+  const dynamicInterval = max(980, wallInterval - score * 6);
+  if (millis() - lastAddTime > dynamicInterval) {
+    const randHeight = round(random(minGapHeight, maxGapHeight));
+    const randY = round(random(0, height - randHeight));
+    walls.push([width, randY, wallWidth, randHeight, 0]);
+
+    if (random() < 0.85) {
+      coinsOnField.push({
+        x: width + wallWidth * 0.7,
+        y: randY + randHeight / 2,
+        r: 10 * uiScale,
+        pulse: random(TWO_PI)
+      });
+    }
+
+    if (random() < 0.22) {
+      magnetsOnField.push({
+        x: width + wallWidth * 1.2,
+        y: randY + randHeight / 2 + random(-40, 40) * uiScale,
+        r: 12 * uiScale,
+        pulse: random(TWO_PI)
+      });
+    }
+
+    lastAddTime = millis();
+  }
+}
+
+function wallHandler() {
+  for (let i = walls.length - 1; i >= 0; i--) {
+    wallRemover(i);
+    wallMover(i);
+    wallDrawer(i);
+    watchWallCollision(i);
+  }
+}
+
+function wallDrawer(index) {
+  const wall = walls[index];
+  const gapWallX = wall[0];
+  const gapWallY = wall[1];
+  const gapWallWidth = wall[2];
+  const gapWallHeight = wall[3];
+
+  rectMode(CORNER);
+  noStroke();
+  fill(getWallColor());
+  rect(gapWallX, 0, gapWallWidth, gapWallY, 0, 0, 15, 15);
+  rect(gapWallX, gapWallY + gapWallHeight, gapWallWidth, height - (gapWallY + gapWallHeight), 15, 15, 0, 0);
+
+  fill(255, 255, 255, 25);
+  rect(gapWallX + gapWallWidth * 0.14, 0, gapWallWidth * 0.18, gapWallY, 8);
+  rect(gapWallX + gapWallWidth * 0.14, gapWallY + gapWallHeight, gapWallWidth * 0.18, height - (gapWallY + gapWallHeight), 8);
+}
+
+function wallMover(index) {
+  walls[index][0] -= wallSpeed + min(score * 0.015, 0.7 * uiScale);
+}
+
+function wallRemover(index) {
+  const wall = walls[index];
+  if (wall[0] + wall[2] <= 0) walls.splice(index, 1);
+}
+
+function watchWallCollision(index) {
+  const wall = walls[index];
+  const gapWallX = wall[0];
+  const gapWallY = wall[1];
+  const gapWallWidth = wall[2];
+  const gapWallHeight = wall[3];
+  const wallScored = wall[4];
+
+  const wallTopX = gapWallX;
+  const wallTopY = 0;
+  const wallTopWidth = gapWallWidth;
+  const wallTopHeight = gapWallY;
+  const wallBottomX = gapWallX;
+  const wallBottomY = gapWallY + gapWallHeight;
+  const wallBottomWidth = gapWallWidth;
+  const wallBottomHeight = height - (gapWallY + gapWallHeight);
+
+  if ((ballX + (ballSize / 2) > wallTopX) && (ballX - (ballSize / 2) < wallTopX + wallTopWidth) && (ballY + (ballSize / 2) > wallTopY) && (ballY - (ballSize / 2) < wallTopY + wallTopHeight)) {
+    decreaseHealth();
+    if (ballX < gapWallX + gapWallWidth / 2) makeBounceRight(gapWallX);
+    else makeBounceLeft(gapWallX + gapWallWidth);
+  }
+
+  if ((ballX + (ballSize / 2) > wallBottomX) && (ballX - (ballSize / 2) < wallBottomX + wallBottomWidth) && (ballY + (ballSize / 2) > wallBottomY) && (ballY - (ballSize / 2) < wallBottomY + wallBottomHeight)) {
+    decreaseHealth();
+    if (ballX < gapWallX + gapWallWidth / 2) makeBounceRight(gapWallX);
+    else makeBounceLeft(gapWallX + gapWallWidth);
+  }
+
+  if (ballX > gapWallX + (gapWallWidth / 2) && wallScored === 0) {
+    wall[4] = 1;
+    addScore(1);
+    maybeSpawnBoss();
+  }
+}
+
+function updateCoins() {
+  for (let i = coinsOnField.length - 1; i >= 0; i--) {
+    const c = coinsOnField[i];
+    c.x -= wallSpeed + min(score * 0.015, 0.7 * uiScale);
+    c.pulse += 0.08;
+
+    const magnetRange = 95 * uiScale;
+    if (magnetActive && dist(ballX, ballY, c.x, c.y) < magnetRange) {
+      c.x = lerp(c.x, ballX, 0.12);
+      c.y = lerp(c.y, ballY, 0.12);
+    }
+
+    if (dist(ballX, ballY, c.x, c.y) <= ballSize * 0.7 + c.r) {
+      addCoin(1);
+      notify(`+1 ${tr("coins")}`, true);
+      burstParticles(c.x, c.y, 12, [241, 196, 15]);
+      soundCoin();
+      coinsOnField.splice(i, 1);
+      continue;
+    }
+
+    if (c.x < -30 * uiScale) coinsOnField.splice(i, 1);
+  }
+}
+
+function drawCoins() {
+  for (let i = 0; i < coinsOnField.length; i++) {
+    const c = coinsOnField[i];
+    noStroke();
+    fill(241, 196, 15, 80);
+    ellipse(c.x, c.y, c.r * 2.6 + sin(c.pulse) * 2, c.r * 2.6 + sin(c.pulse) * 2);
+    fill(255, 215, 0);
+    ellipse(c.x, c.y, c.r * 2, c.r * 2);
+    fill(255, 244, 180);
+    ellipse(c.x - c.r * 0.2, c.y - c.r * 0.2, c.r * 0.65, c.r * 0.65);
+  }
+}
+
+function updateMagnets() {
+  for (let i = magnetsOnField.length - 1; i >= 0; i--) {
+    const m = magnetsOnField[i];
+    m.x -= wallSpeed + min(score * 0.015, 0.7 * uiScale);
+    m.pulse += 0.12;
+
+    if (dist(ballX, ballY, m.x, m.y) <= ballSize * 0.7 + m.r) {
+      magnetActive = true;
+      magnetTimer = 60 * 8;
+      notify(`${tr("magnetOn")} 8s`, true);
+      burstParticles(m.x, m.y, 16, [52, 152, 219]);
+      soundPower();
+      magnetsOnField.splice(i, 1);
+      continue;
+    }
+
+    if (m.x < -40 * uiScale) magnetsOnField.splice(i, 1);
+  }
+}
+
+function drawMagnets() {
+  for (let i = 0; i < magnetsOnField.length; i++) {
+    const m = magnetsOnField[i];
+    noStroke();
+    fill(52, 152, 219, 70);
+    ellipse(m.x, m.y, m.r * 2.7 + sin(m.pulse) * 2, m.r * 2.7 + sin(m.pulse) * 2);
+
+    fill(52, 152, 219);
+    arc(m.x - m.r * 0.25, m.y, m.r * 1.1, m.r * 1.25, HALF_PI, PI + HALF_PI);
+    arc(m.x + m.r * 0.25, m.y, m.r * 1.1, m.r * 1.25, -HALF_PI, HALF_PI);
+
+    fill(255);
+    rectMode(CENTER);
+    rect(m.x - m.r * 0.55, m.y + m.r * 0.3, m.r * 0.28, m.r * 0.22, 4);
+    rect(m.x + m.r * 0.55, m.y + m.r * 0.3, m.r * 0.28, m.r * 0.22, 4);
+  }
+}
+
+function updatePowerTimers() {
+  if (magnetTimer > 0) {
+    magnetTimer--;
+    if (magnetTimer <= 0) {
+      magnetActive = false;
+      magnetTimer = 0;
+    }
+  }
+}
+
+function maybeSpawnBoss() {
+  if (!boss && score > 0 && score % bossEveryScore === 0) {
+    bossWarningTimer = 90;
+    boss = {
+      x: width + 140 * uiScale,
+      y: height * 0.5,
+      w: 100 * uiScale,
+      h: 130 * uiScale,
+      hp: 4 + floor(score / bossEveryScore),
+      maxHp: 4 + floor(score / bossEveryScore),
+      dir: random() > 0.5 ? 1 : -1,
+      phase: 0,
+      hitCooldown: 0,
+      reward: 8 + floor(score * 0.30)
+    };
+    soundBoss();
+    vibrate(70);
+    walls = [];
+    coinsOnField = [];
+    magnetsOnField = [];
+  }
+}
+
+function updateBoss() {
+  if (!boss) return;
+  bossActiveColorPulse += 0.06;
+  boss.phase += 0.015;
+  boss.x = lerp(boss.x, width * 0.77, 0.02);
+  boss.y += boss.dir * (0.55 + sin(boss.phase) * 0.25) * uiScale;
+
+  if (boss.y < boss.h / 2 + 55 * uiScale) boss.dir = 1;
+  if (boss.y > height - boss.h / 2 - 55 * uiScale) boss.dir = -1;
+  if (boss.hitCooldown > 0) boss.hitCooldown--;
+
+  const armLength = 38 * uiScale;
+  const armGap = 38 * uiScale;
+  const armTopY = boss.y - armGap;
+  const armBottomY = boss.y + armGap;
+  const armX = boss.x - boss.w / 2;
+
+  if (
+    circleRectCollision(ballX, ballY, ballSize, boss.x - boss.w / 2, boss.y - boss.h / 2, boss.w, boss.h) ||
+    circleRectCollision(ballX, ballY, ballSize, armX - armLength, armTopY - 7 * uiScale, armLength, 14 * uiScale) ||
+    circleRectCollision(ballX, ballY, ballSize, armX - armLength, armBottomY - 7 * uiScale, armLength, 14 * uiScale)
+  ) {
+    if (boss.hitCooldown === 0) {
+      boss.hitCooldown = 20;
+      decreaseHealth(true);
+      if (ballX < boss.x) makeBounceRight(boss.x - boss.w / 2);
+      else makeBounceLeft(boss.x + boss.w / 2);
+    }
+  }
+
+  if (
+    ballX + ballSize / 2 > boss.x - boss.w / 2 &&
+    ballX < boss.x - boss.w * 0.1 &&
+    abs(ballY - boss.y) < boss.h * 0.28
+  ) {
+    if (abs(ballSpeedHorizon) > 0.7 * uiScale && boss.hitCooldown === 0) {
+      boss.hp--;
+      boss.hitCooldown = 18;
+      makeBounceRight(boss.x - boss.w / 2);
+      burstParticles(ballX, ballY, 14, [241, 196, 15]);
+      soundCoin();
+      if (boss.hp <= 0) defeatBoss();
+    }
+  }
+}
+
+function drawBoss() {
+  if (!boss) return;
+
+  const pulse = 30 + sin(bossActiveColorPulse) * 15;
+  noStroke();
+  fill(231, 76, 60, 70 + pulse);
+  ellipse(boss.x, boss.y, boss.w * 1.45, boss.h * 1.15);
+
+  rectMode(CENTER);
+  fill(192, 57, 43);
+  rect(boss.x, boss.y, boss.w, boss.h, 20);
+
+  fill(241, 196, 15);
+  ellipse(boss.x - boss.w * 0.18, boss.y, 26 * uiScale, 26 * uiScale);
+  fill(255);
+  ellipse(boss.x - boss.w * 0.18, boss.y, 11 * uiScale, 11 * uiScale);
+
+  fill(231, 76, 60);
+  rect(boss.x - boss.w * 0.80, boss.y - 38 * uiScale, 38 * uiScale, 14 * uiScale, 10);
+  rect(boss.x - boss.w * 0.80, boss.y + 38 * uiScale, 38 * uiScale, 14 * uiScale, 10);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(14 * uiScale);
+  text(`${tr("boss")}`, boss.x, boss.y - boss.h * 0.78);
+
+  const barW = 110 * uiScale;
+  const barH = 10 * uiScale;
+  const barX = boss.x - barW / 2;
+  const barY = boss.y - boss.h * 0.62;
+
+  rectMode(CORNER);
+  fill(60, 60, 70, 180);
+  rect(barX, barY, barW, barH, 8);
+  fill(241, 196, 15);
+  rect(barX, barY, barW * (boss.hp / boss.maxHp), barH, 8);
+}
+
+function defeatBoss() {
+  addScore(3);
+  addCoin(boss.reward);
+  notify(`${tr("bossDefeated")} +${boss.reward} ${tr("coins")}`, true);
+  burstParticles(boss.x, boss.y, 30, [241, 196, 15]);
+  soundBuy();
+  boss = null;
+  lastAddTime = millis();
+}
+
+function circleRectCollision(cx, cy, cd, rx, ry, rw, rh) {
+  const testX = constrain(cx, rx, rx + rw);
+  const testY = constrain(cy, ry, ry + rh);
+  return dist(cx, cy, testX, testY) <= cd / 2;
+}
+
+function addScore(amount) {
+  score += amount || 1;
+}
+
+function addCoin(amount) {
+  runCoins += amount || 1;
+}
+
+function decreaseHealth(fromBoss) {
+  health -= fromBoss ? healthDecrease * 1.3 : healthDecrease;
+  soundHit();
+  vibrate(fromBoss ? 60 : 35);
+  burstParticles(ballX, ballY, 12, [231, 76, 60]);
+  if (health <= 0) {
+    health = 0;
+    gameOver();
+  }
+}
+
+function drawHud() {
+  fill(getCardColor());
+  rectMode(CORNER);
+  noStroke();
+  rect(12 * uiScale, 12 * uiScale, 190 * uiScale, 116 * uiScale, 14);
+
+  fill(getTextMain());
+  textAlign(LEFT, TOP);
+  textSize(16 * uiScale);
+  text(`${tr("score")}: ${score}`, 24 * uiScale, 24 * uiScale);
+  text(`${tr("coins")}: ${runCoins}`, 24 * uiScale, 46 * uiScale);
+  text(`${tr("best")}: ${bestScore}`, 24 * uiScale, 68 * uiScale);
+
+  if (magnetActive) {
+    fill(52, 152, 219);
+    textSize(13 * uiScale);
+    text(`${tr("magnet")}: ${ceil(magnetTimer / 60)}s`, 24 * uiScale, 90 * uiScale);
+  }
+
+  drawHealthBar();
+}
+
+function drawHealthBar() {
+  noStroke();
+  fill(darkUi ? 90 : 189, darkUi ? 98 : 195, darkUi ? 110 : 199);
+  rectMode(CORNER);
+  rect(width - 126 * uiScale, 28 * uiScale, healthBarWidth, 8 * uiScale, 6);
+  if (health > 60) fill(46, 204, 113);
+  else if (health > 30) fill(230, 126, 34);
+  else fill(231, 76, 60);
+  rect(width - 126 * uiScale, 28 * uiScale, healthBarWidth * (health / maxHealth), 8 * uiScale, 6);
+  fill(getTextMain());
+  textAlign(CENTER, TOP);
+  textSize(12 * uiScale);
+  text(tr("health"), width - 91 * uiScale, 42 * uiScale);
+}
+
+function burstParticles(x, y, count, c) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x,
+      y: y,
+      vx: random(-2.0, 2.0) * uiScale,
+      vy: random(-2.0, 2.0) * uiScale,
+      life: random(18, 30),
+      size: random(2, 5) * uiScale,
+      col: c || [52, 152, 219]
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 1;
+    p.vx *= 0.98;
+    p.vy *= 0.98;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  noStroke();
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    fill(p.col[0], p.col[1], p.col[2], p.life * 8);
+    ellipse(p.x, p.y, p.size, p.size);
+  }
+}
+
+function drawNotifications() {
+  for (let i = notifications.length - 1; i >= 0; i--) {
+    let n = notifications[i];
+    n.life--;
+    rectMode(CENTER);
+    noStroke();
+    fill(n.good ? color(46, 204, 113, min(210, n.life * 2)) : color(231, 76, 60, min(210, n.life * 2)));
+    rect(width / 2, 76 * uiScale + i * 30 * uiScale, 300 * uiScale, 26 * uiScale, 12);
+    fill(255, min(255, n.life * 3));
+    textAlign(CENTER, CENTER);
+    textSize(12 * uiScale);
+    text(n.text, width / 2, 76 * uiScale + i * 30 * uiScale);
+    if (n.life <= 0) notifications.splice(i, 1);
+  }
+}
+
+function mousePressed() {
+  handlePress(mouseX, mouseY);
+}
+
+function touchStarted() {
+  if (touches.length > 0) handlePress(touches[0].x, touches[0].y);
+  return false;
+}
+
+function handlePress(px, py) {
+  ensureAudio();
+
+  if (isInsideButton(px, py, langBtn)) {
+    currentLang = currentLang === "ro" ? "en" : "ro";
+    return;
+  }
+
+  if (gameScreen === 0) {
+    if (isInsideButton(px, py, diffEasyBtn)) { difficulty = "easy"; applyDifficulty(); return; }
+    if (isInsideButton(px, py, diffMediumBtn)) { difficulty = "medium"; applyDifficulty(); return; }
+    if (isInsideButton(px, py, diffHardBtn)) { difficulty = "hard"; applyDifficulty(); return; }
+    if (isInsideButton(px, py, dailyRewardBtn)) { claimDailyReward(); return; }
+    if (isInsideButton(px, py, startBtn)) { startGame(); return; }
+    if (isInsideButton(px, py, shopBtn)) { gameScreen = 3; return; }
+    if (isInsideButton(px, py, settingsBtn)) { gameScreen = 4; return; }
+  }
+
+  if (gameScreen === 1) {
+    if (isInsideButton(px, py, pauseBtn)) { togglePause(); return; }
+  }
+
+  if (gameScreen === 2) {
+    if (isInsideButton(px, py, restartBtn)) { restartGame(); return; }
+    if (isInsideButton(px, py, backBtn)) { goMenu(); return; }
+  }
+
+  if (gameScreen === 3) {
+    if (isInsideButton(px, py, backBtn)) { goMenu(); return; }
+    if (isInsideButton(px, py, skinsTabBtn)) { shopTab = "skins"; return; }
+    if (isInsideButton(px, py, themesTabBtn)) { shopTab = "themes"; return; }
+    for (const btn of shopItemButtons) {
+      if (isInsideButton(px, py, btn)) { buyOrEquip(btn.itemId, btn.isSkin); return; }
+    }
+  }
+
+  if (gameScreen === 4) {
+    if (isInsideButton(px, py, backBtn)) { goMenu(); return; }
+    for (const btn of settingsToggles) {
+      if (isInsideButton(px, py, btn)) { toggleSetting(btn.key); return; }
+    }
+    if (isInsideButton(px, py, diffEasyBtn)) { difficulty = "easy"; applyDifficulty(); return; }
+    if (isInsideButton(px, py, diffMediumBtn)) { difficulty = "medium"; applyDifficulty(); return; }
+    if (isInsideButton(px, py, diffHardBtn)) { difficulty = "hard"; applyDifficulty(); return; }
+  }
+
+  if (gameScreen === 5) {
+    if (isInsideButton(px, py, resumeBtn)) { togglePause(); return; }
+    if (isInsideButton(px, py, restartBtn)) { restartGame(); return; }
+    if (isInsideButton(px, py, backBtn)) { goMenu(); return; }
+  }
+}
+
+function isInsideButton(px, py, btn) {
+  if (!btn) return false;
+  return (
+    px >= btn.x - btn.w / 2 &&
+    px <= btn.x + btn.w / 2 &&
+    py >= btn.y - btn.h / 2 &&
+    py <= btn.y + btn.h / 2
+  );
+}
+</script>
+</body>
+</html>
